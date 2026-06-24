@@ -1,0 +1,122 @@
+@startuml 学员报名活动图
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+    BackgroundColor #E8F5E9
+    BorderColor #2E7D32
+    FontSize 12
+    DiamondBackgroundColor #FFF9C4
+    DiamondBorderColor #F9A825
+}
+skinparam swimlane {
+    BackgroundColor #F5F5F5
+    BorderColor #9E9E9E
+    FontSize 13
+    FontStyle bold
+}
+
+title 教育培训机构学员报名活动图
+
+|学生/家长|
+start
+:了解培训课程;
+:电话/到店咨询;
+
+|教务人员|
+:接待咨询;
+:介绍课程体系;
+:了解学员基础与需求;
+
+|系统|
+:查询匹配课程;
+:展示课程详情（课时、费用、教师）;
+
+|学生/家长|
+if (是否安排试听?) then (是)
+    :申请试听;
+
+    |教务人员|
+    :安排试听课;
+    :通知试听时间/地点;
+
+    |教师|
+    :执行试听课教学;
+    :记录试听反馈;
+
+    |学生/家长|
+    if (试听满意?) then (是)
+        :确认报名意向;
+    else (否)
+        :放弃报名;
+        stop
+    endif
+else (否)
+    :直接确认报名意向;
+endif
+
+|教务人员|
+:引导填写报名信息;
+:收集学员基本资料;
+
+|系统|
+:录入学员信息;
+:生成学员档案;
+
+|学生/家长|
+:选择课程套餐;
+
+|教务人员|
+:确认课程选择;
+:计算课程费用;
+
+|系统|
+if (是否有适合开班?) then (是)
+    :匹配现有班级;
+else (否)
+    :标记为待开班学员;
+    :加入等候队列;
+    note right
+        教务人员后续
+        安排新班开课
+    end note
+endif
+
+:分配学员至对应班级;
+:更新班级学员名册;
+
+|财务人员|
+:生成缴费通知单;
+:通知学员缴费;
+
+|学生/家长|
+:缴纳学费;
+note right
+    详细缴费流程
+    参见收费管理活动图
+end note
+
+|财务人员|
+:确认到账;
+:开具收据;
+
+|系统|
+:更新学员状态为"已缴费";
+:激活学员课程权限;
+
+|教务人员|
+:发放教材/学习资料;
+:通知开课时间;
+
+|教师|
+:编制学员花名册;
+:准备教学计划;
+
+|系统|
+:发送开课通知;
+:更新班级状态;
+
+|学生/家长|
+:按时到课;
+stop
+
+@enduml

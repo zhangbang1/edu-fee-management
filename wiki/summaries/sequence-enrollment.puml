@@ -1,0 +1,151 @@
+@startuml 学员报名缴费时序图
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam participant {
+    BackgroundColor #E3F2FD
+    BorderColor #1565C0
+    FontSize 13
+}
+skinparam sequence {
+    MessageAlign center
+    LifeLineBorderColor #1565C0
+    LifeLineBackgroundColor #E3F2FD
+    GroupBackgroundColor #FFF9C4
+    GroupBorderColor #F9A825
+    GroupFontSize 13
+    GroupFontStyle bold
+}
+
+title 教育培训机构 - 学员报名缴费时序图
+
+actor "学生/家长" as Student
+participant "Web前端\n(Frontend)" as Frontend
+participant "报名Controller\n(EnrollmentController)" as Controller
+participant "报名Service\n(EnrollmentService)" as Service
+participant "费用Service\n(FeeService)" as FeeService
+participant "通知Service\n(NotifyService)" as NotifyService
+database "数据库\n(MySQL)" as DB
+actor "教务系统\n(Academic)" as Academic
+actor "财务系统\n(Finance)" as Finance
+
+' ============================================
+' 阶段一：学员信息登记
+' ============================================
+== 阶段一：学员信息登记 ==
+
+Student -> Frontend : 1. 填写报名信息
+Frontend -> Frontend : 2. 前端表单校验
+Frontend -> Controller : 3. POST /api/enrollment/submit\n{name, phone, courseId, ...}
+
+Controller -> Service : 4. submitEnrollment(dto)
+Service -> DB : 5. INSERT INTO student\n(验证手机号唯一性)
+
+alt 学员已存在
+    DB --> Service : 6a. 返回已存在学员信息
+    Service --> Controller : 7a. 返回学员已注册
+    Controller --> Frontend : 8a. 提示学员已存在
+    Frontend --> Student : 9a. 显示"您已是老学员，请直接选课"
+else 新学员注册
+    DB --> Service : 6b. 插入成功，返回studentId
+    Service -> DB : 7b. INSERT INTO enrollment\n(报名记录)
+    DB --> Service : 8b. 插入成功，返回enrollmentId
+    Service --> Controller : 9b. 返回报名成功(enrollmentId)
+    Controller --> Frontend : 10b. 返回报名成功数据
+    Frontend --> Student : 11b. 展示"报名成功，请选择课程"
+end
+
+' ============================================
+' 阶段二：选课与分班
+' ============================================
+== 阶段二：选课与分班 ==
+
+Student -> Frontend : 12. 选择意向课程
+Frontend -> Controller : 13. GET /api/course/list\n查询可选课程
+
+Controller -> Service : 14. getAvailableCourses(studentId)
+Service -> DB : 15. SELECT * FROM course\nWHERE status='OPEN'
+DB --> Service : 16. 返回课程列表
+Service -> DB : 17. SELECT * FROM class\nWHERE courseId IN (...)\nAND currentCount < maxCapacity
+DB --> Service : 18. 返回可选班级
+
+Service --> Controller : 19. 返回课程+班级数据
+Controller --> Frontend : 20. 返回课程+班级JSON
+Frontend --> Student : 21. 展示课程与班级选择界面
+
+Student -> Frontend : 22. 确认课程和班级
+Frontend -> Controller : 23. POST /api/enrollment/assignClass\n{enrollmentId, classId}
+
+Controller -> Service : 24. assignClass(enrollmentId, classId)
+Service -> DB : 25. UPDATE enrollment SET classId=?\nWHERE enrollmentId=?
+DB --> Service : 26. 更新成功
+Service -> DB : 27. UPDATE class\nSET currentCount = currentCount + 1\nWHERE classId=?
+DB --> Service : 28. 更新班级人数成功
+
+Service --> Controller : 29. 分班成功
+Controller --> Frontend : 30. 返回分班结果
+Frontend --> Student : 31. 展示"分班成功，请完成缴费"
+
+Service -> NotifyService : 32. 异步通知教务
+NotifyService -> Academic : 33. 推送新报名通知
+
+' ============================================
+' 阶段三：费用计算与缴费
+' ============================================
+== 阶段三：费用计算与缴费 ==
+
+Controller -> FeeService : 34. calculateFee(enrollmentId)
+
+FeeService -> DB : 35. SELECT * FROM enrollment\nJOIN course ON ...\nWHERE enrollmentId=?
+DB --> FeeService : 36. 返回报名及课程信息
+
+FeeService -> DB : 37. SELECT * FROM discount\nWHERE studentId=? OR courseId=?
+DB --> FeeService : 38. 返回适用折扣
+
+FeeService -> FeeService : 39. 计算最终费用\n(原价 - 折扣 = 实付)
+
+FeeService --> Controller : 40. 返回费用明细
+Controller --> Frontend : 41. 返回费用详情JSON
+Frontend --> Student : 42. 展示费用明细与支付方式
+
+Student -> Frontend : 43. 选择支付方式并确认支付
+Frontend -> Controller : 44. POST /api/payment/pay\n{enrollmentId, amount, payMethod}
+
+Controller -> FeeService : 45. processPayment(paymentDto)
+
+FeeService -> DB : 46. BEGIN TRANSACTION
+FeeService -> DB : 47. INSERT INTO fee_record\n(enrollmentId, amount, payMethod, ...)
+DB --> FeeService : 48. 插入收费记录成功(feeId)
+FeeService -> DB : 49. UPDATE enrollment\nSET payStatus='PAID', paidAt=NOW()\nWHERE enrollmentId=?
+DB --> FeeService : 50. 更新缴费状态成功
+FeeService -> DB : 51. COMMIT
+
+FeeService --> Controller : 52. 支付成功(feeId)
+Controller --> Frontend : 53. 返回支付成功
+Frontend --> Student : 54. 展示"缴费成功"及电子收据
+
+FeeService -> NotifyService : 55. 异步发送通知
+NotifyService -> Finance : 56. 推送收费记录至财务系统
+NotifyService -> Student : 57. 发送缴费成功短信/推送
+
+' ============================================
+' 阶段四：开课准备
+' ============================================
+== 阶段四：开课通知 ==
+
+FeeService -> DB : 58. SELECT * FROM schedule\nWHERE classId=?
+DB --> FeeService : 59. 返回排课信息
+
+Service -> NotifyService : 60. 发送开课通知
+NotifyService -> Student : 61. 推送开课提醒（时间/教室/教师）
+NotifyService -> Academic : 62. 推送学员到班通知
+
+Student -> Frontend : 63. 查看个人课表
+Frontend -> Controller : 64. GET /api/student/schedule
+Controller -> Service : 65. getStudentSchedule(studentId)
+Service -> DB : 66. SELECT s.*, c.name, t.name, r.name\nFROM schedule s JOIN ...
+DB --> Service : 67. 返回课表数据
+Service --> Controller : 68. 返回课表
+Controller --> Frontend : 69. 返回课表JSON
+Frontend --> Student : 70. 展示个人课表
+
+@enduml

@@ -1,0 +1,1926 @@
+openapi: "3.0.3"
+info:
+  title: "教育培训机构教务收费管理系统 API（EduFeeMS）"
+  description: >
+    教育培训机构教务收费管理系统（EduFeeMS）RESTful API 接口契约文档。
+    涵盖认证、学员管理、课程管理、班级管理、收费管理、考勤管理六大业务域。
+  version: "1.0.0"
+  contact:
+    name: "EduFeeMS 开发团队"
+servers:
+  - url: "http://localhost:8080/api"
+    description: "本地开发环境"
+  - url: "https://edu-fee-ms.example.com/api"
+    description: "生产环境"
+
+tags:
+  - name: auth
+    description: "认证接口 — 登录、登出、获取当前用户信息"
+  - name: students
+    description: "学员管理 — 学员CRUD、分班、转班、退学"
+  - name: courses
+    description: "课程管理 — 课程查询与新增"
+  - name: classes
+    description: "班级管理 — 班级创建、排课"
+  - name: fees
+    description: "收费管理 — 收费、退费、台账、欠费催缴"
+  - name: attendances
+    description: "考勤管理 — 签到、请假、考勤统计"
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ==================== 认证接口 ====================
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: "用户登录"
+      description: "使用用户名和密码登录，返回JWT Token"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: "admin"
+              password: "Admin@123456"
+      responses:
+        "200":
+          description: "登录成功，返回Token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: "用户名或密码错误"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: "用户登出"
+      description: "使当前JWT Token失效"
+      responses:
+        "200":
+          description: "登出成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      tags:
+        - auth
+      summary: "获取当前用户信息"
+      description: "根据JWT Token获取当前登录用户的详细信息"
+      responses:
+        "200":
+          description: "成功获取用户信息"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfoResponse"
+        "401":
+          description: "未登录或Token已过期"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ==================== 学员管理 ====================
+  /students:
+    get:
+      tags:
+        - students
+      summary: "分页查询学员列表"
+      description: "按条件分页查询学员，支持姓名、手机号、状态筛选"
+      parameters:
+        - name: pageNum
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: "页码"
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+          description: "每页条数"
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "学员姓名（模糊匹配）"
+        - name: phone
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "手机号（模糊匹配，结果已脱敏）"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/StudentStatus"
+          description: "学员状态"
+      responses:
+        "200":
+          description: "分页查询成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentPageResponse"
+
+    post:
+      tags:
+        - students
+      summary: "新增学员"
+      description: "录入新学员基本信息"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentCreateRequest"
+            example:
+              name: "张三"
+              gender: "MALE"
+              phone: "13800138000"
+              birthday: "2012-05-15"
+              parentName: "张父"
+              parentPhone: "13900139000"
+              address: "北京市朝阳区XX路XX号"
+              source: "WALK_IN"
+              remark: "有英语基础"
+      responses:
+        "200":
+          description: "新增成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentResponse"
+        "400":
+          description: "参数校验失败"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+
+  /students/{id}:
+    get:
+      tags:
+        - students
+      summary: "获取学员详情"
+      description: "根据ID获取学员详细信息，含班级信息和缴费记录摘要"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: "学员ID"
+      responses:
+        "200":
+          description: "查询成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentDetailResponse"
+        "404":
+          description: "学员不存在"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      tags:
+        - students
+      summary: "修改学员信息"
+      description: "更新学员基本信息（不含分班/转班操作）"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: "学员ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentUpdateRequest"
+            example:
+              name: "张三"
+              phone: "13800138001"
+              address: "北京市海淀区XX路XX号"
+              remark: "已完成基础阶段"
+      responses:
+        "200":
+          description: "修改成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentResponse"
+
+  /students/{id}/enroll:
+    post:
+      tags:
+        - students
+      summary: "学员分班"
+      description: "将学员分入指定班级，需校验班级容量与学员状态"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: "学员ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollRequest"
+            example:
+              classId: 1
+              effectiveDate: "2026-07-01"
+      responses:
+        "200":
+          description: "分班成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollResponse"
+        "400":
+          description: "班级已满员或学员状态异常"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /students/{id}/transfer:
+    post:
+      tags:
+        - students
+      summary: "学员转班"
+      description: "将学员从当前班级转到目标班级"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: "学员ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferRequest"
+            example:
+              targetClassId: 2
+              transferDate: "2026-07-15"
+              reason: "课程时间冲突"
+      responses:
+        "200":
+          description: "转班成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResponse"
+
+  /students/{id}/withdraw:
+    post:
+      tags:
+        - students
+      summary: "学员退学"
+      description: "标记学员退学，需关联退费流程"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: "学员ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawRequest"
+            example:
+              withdrawDate: "2026-07-20"
+              reason: "家庭搬迁"
+              requireRefund: true
+      responses:
+        "200":
+          description: "退学申请成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawResponse"
+
+  # ==================== 课程管理 ====================
+  /courses:
+    get:
+      tags:
+        - courses
+      summary: "分页查询课程列表"
+      description: "按条件分页查询课程，支持类型、状态筛选"
+      parameters:
+        - name: pageNum
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/CourseType"
+          description: "课程类型"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/CourseStatus"
+          description: "课程状态"
+        - name: keyword
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "课程名称关键词"
+      responses:
+        "200":
+          description: "分页查询成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoursePageResponse"
+
+    post:
+      tags:
+        - courses
+      summary: "新增课程"
+      description: "创建新课程，定义课程名称、类型、课时、定价"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseCreateRequest"
+            example:
+              name: "少儿英语启蒙班"
+              type: "ENGLISH"
+              totalHours: 48
+              price: 4800.00
+              description: "针对6-8岁儿童的英语启蒙课程，涵盖字母、单词、简单对话"
+      responses:
+        "200":
+          description: "新增成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+
+  # ==================== 班级管理 ====================
+  /classes:
+    get:
+      tags:
+        - classes
+      summary: "分页查询班级列表"
+      description: "按条件分页查询班级，支持课程、状态、时间范围筛选"
+      parameters:
+        - name: pageNum
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: courseId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: "关联课程ID"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ClassStatus"
+          description: "班级状态"
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: "开课起始日期"
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: "开课截止日期"
+      responses:
+        "200":
+          description: "分页查询成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassPageResponse"
+
+    post:
+      tags:
+        - classes
+      summary: "创建班级"
+      description: "基于课程创建新班级，设定容量、开课日期"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClassCreateRequest"
+            example:
+              courseId: 1
+              name: "少儿英语启蒙1班"
+              capacity: 20
+              startDate: "2026-09-01"
+              endDate: "2027-01-15"
+              teacherId: 3
+              classroom: "301教室"
+      responses:
+        "200":
+          description: "创建成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassResponse"
+
+  /classes/{id}/schedules:
+    post:
+      tags:
+        - classes
+      summary: "排课"
+      description: "为班级安排课程表，需检测时间冲突"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: "班级ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleCreateRequest"
+            example:
+              schedules:
+                - dayOfWeek: 1
+                  startTime: "09:00"
+                  endTime: "10:30"
+                  teacherId: 3
+                  classroom: "301教室"
+                - dayOfWeek: 3
+                  startTime: "09:00"
+                  endTime: "10:30"
+                  teacherId: 3
+                  classroom: "301教室"
+      responses:
+        "200":
+          description: "排课成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+
+  # ==================== 收费管理 ====================
+  /fees/payment:
+    post:
+      tags:
+        - fees
+      summary: "学费收取"
+      description: "为学员创建收费记录，支持全款/分期收取"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentCreateRequest"
+            example:
+              studentId: 1
+              classId: 1
+              amount: 4800.00
+              paymentMethod: "WECHAT_PAY"
+              installmentPlan: "FULL"
+              remark: "全款缴纳"
+      responses:
+        "200":
+          description: "收费成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          description: "金额异常或学员状态不符"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /fees/refund:
+    post:
+      tags:
+        - fees
+      summary: "退费处理"
+      description: "处理学员退费，校验退费金额不得超过已收金额"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundRequest"
+            example:
+              paymentId: 1
+              amount: 2400.00
+              refundMethod: "ORIGINAL"
+              reason: "学员退学，按剩余课时比例退费"
+      responses:
+        "200":
+          description: "退费成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefundResponse"
+
+  /fees/records:
+    get:
+      tags:
+        - fees
+      summary: "收费台账查询"
+      description: "查询收费台账明细，支持多维度筛选"
+      parameters:
+        - name: pageNum
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: studentId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: "学员ID"
+        - name: classId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: "班级ID"
+        - name: paymentStatus
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: keyword
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "流水号/学员姓名模糊搜索"
+      responses:
+        "200":
+          description: "查询成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeeRecordPageResponse"
+
+  /fees/dunning:
+    get:
+      tags:
+        - fees
+      summary: "欠费查询"
+      description: "查询欠费学员列表，支持按欠费金额区间筛选"
+      parameters:
+        - name: pageNum
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: classId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: minAmount
+          in: query
+          required: false
+          schema:
+            type: number
+          description: "最低欠费金额"
+        - name: maxAmount
+          in: query
+          required: false
+          schema:
+            type: number
+          description: "最高欠费金额"
+        - name: overdueDays
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: "逾期天数下限"
+      responses:
+        "200":
+          description: "查询成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DunningPageResponse"
+
+  # ==================== 考勤管理 ====================
+  /attendances/checkin:
+    post:
+      tags:
+        - attendances
+      summary: "签到"
+      description: "学员签到，记录签到时间、方式"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckinRequest"
+            example:
+              studentId: 1
+              scheduleId: 1
+              checkinType: "FACE"
+              location: "301教室"
+      responses:
+        "200":
+          description: "签到成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckinResponse"
+
+  /attendances/leave:
+    post:
+      tags:
+        - attendances
+      summary: "请假申请"
+      description: "为学员提交请假申请"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveRequest"
+            example:
+              studentId: 1
+              scheduleId: 1
+              leaveType: "SICK"
+              reason: "感冒发烧"
+              startDate: "2026-09-05"
+              endDate: "2026-09-05"
+      responses:
+        "200":
+          description: "请假成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveResponse"
+
+  /attendances/statistics:
+    get:
+      tags:
+        - attendances
+      summary: "考勤统计"
+      description: "按班级/学员维度统计考勤数据，包含出勤率、缺勤次数、请假次数"
+      parameters:
+        - name: classId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: "班级ID"
+        - name: studentId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: "学员ID"
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: "统计起始日期"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: "统计截止日期"
+      responses:
+        "200":
+          description: "统计成功"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceStatisticsResponse"
+
+# ==================== Components ====================
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT认证，登录后获取Token，请求时携带 Authorization: Bearer <token>"
+
+  schemas:
+
+    # ---- 通用响应 ----
+    SuccessResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: "状态码，200表示成功"
+          example: 200
+        message:
+          type: string
+          description: "提示信息"
+          example: "操作成功"
+        data:
+          type: object
+          nullable: true
+          description: "响应数据"
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: "错误码"
+          example: 401
+        message:
+          type: string
+          description: "错误信息"
+          example: "用户名或密码错误"
+        data:
+          type: object
+          nullable: true
+          example: null
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: "参数校验失败"
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    PageInfo:
+      type: object
+      properties:
+        pageNum:
+          type: integer
+          description: "当前页码"
+        pageSize:
+          type: integer
+          description: "每页条数"
+        total:
+          type: integer
+          format: int64
+          description: "总记录数"
+        pages:
+          type: integer
+          description: "总页数"
+
+    # ---- 认证相关 ----
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: "用户名"
+          minLength: 2
+          maxLength: 50
+          example: "admin"
+        password:
+          type: string
+          description: "密码"
+          format: password
+          minLength: 6
+          maxLength: 128
+          example: "Admin@123456"
+
+    LoginResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "登录成功"
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: "JWT Token"
+              example: "eyJhbGciOiJIUzI1NiIs..."
+            tokenType:
+              type: string
+              example: "Bearer"
+            expiresIn:
+              type: integer
+              description: "过期时间（秒）"
+              example: 7200
+            userInfo:
+              $ref: "#/components/schemas/UserInfo"
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        username:
+          type: string
+          example: "admin"
+        realName:
+          type: string
+          example: "系统管理员"
+        role:
+          type: string
+          enum: ["ADMIN", "FINANCE", "ACADEMIC", "TEACHER"]
+          example: "ADMIN"
+        phone:
+          type: string
+          example: "138****8000"
+
+    UserInfoResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          $ref: "#/components/schemas/UserInfo"
+
+    # ---- 学员相关 ----
+    StudentStatus:
+      type: string
+      enum:
+        - ENROLLED
+        - IN_CLASS
+        - WITHDRAWN
+        - GRADUATED
+      description: "学员状态：ENROLLED-已报名, IN_CLASS-在读, WITHDRAWN-已退学, GRADUATED-已毕业"
+
+    StudentCreateRequest:
+      type: object
+      required:
+        - name
+        - phone
+      properties:
+        name:
+          type: string
+          description: "学员姓名"
+          minLength: 1
+          maxLength: 50
+        gender:
+          type: string
+          enum: ["MALE", "FEMALE"]
+          description: "性别"
+        phone:
+          type: string
+          description: "手机号"
+          pattern: "^1[3-9]\\d{9}$"
+        birthday:
+          type: string
+          format: date
+          description: "出生日期"
+        parentName:
+          type: string
+          description: "家长姓名"
+          maxLength: 50
+        parentPhone:
+          type: string
+          description: "家长手机号"
+          pattern: "^1[3-9]\\d{9}$"
+        address:
+          type: string
+          description: "联系地址"
+          maxLength: 200
+        source:
+          type: string
+          enum: ["WALK_IN", "REFERRAL", "ONLINE", "EVENT", "OTHER"]
+          description: "来源渠道"
+        remark:
+          type: string
+          description: "备注"
+          maxLength: 500
+
+    StudentUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        gender:
+          type: string
+          enum: ["MALE", "FEMALE"]
+        birthday:
+          type: string
+          format: date
+        parentName:
+          type: string
+        parentPhone:
+          type: string
+        address:
+          type: string
+        remark:
+          type: string
+
+    StudentDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        gender:
+          type: string
+        phone:
+          type: string
+          description: "手机号（列表场景脱敏）"
+        birthday:
+          type: string
+          format: date
+        parentName:
+          type: string
+        parentPhone:
+          type: string
+        address:
+          type: string
+        source:
+          type: string
+        status:
+          $ref: "#/components/schemas/StudentStatus"
+        createTime:
+          type: string
+          format: date-time
+          example: "2026-06-22 10:30:00"
+
+    StudentResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          $ref: "#/components/schemas/StudentDTO"
+
+    StudentDetailResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          allOf:
+            - $ref: "#/components/schemas/StudentDTO"
+            - type: object
+              properties:
+                currentClass:
+                  $ref: "#/components/schemas/ClassDTO"
+                enrollmentHistory:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/EnrollmentRecordDTO"
+                recentPayments:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/FeeRecordDTO"
+
+    StudentPageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          type: object
+          properties:
+            pageInfo:
+              $ref: "#/components/schemas/PageInfo"
+            records:
+              type: array
+              items:
+                $ref: "#/components/schemas/StudentDTO"
+
+    EnrollmentRecordDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        classId:
+          type: integer
+          format: int64
+        className:
+          type: string
+        enrollDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: ["ACTIVE", "TRANSFERRED", "WITHDRAWN"]
+
+    EnrollRequest:
+      type: object
+      required:
+        - classId
+      properties:
+        classId:
+          type: integer
+          format: int64
+          description: "目标班级ID"
+        effectiveDate:
+          type: string
+          format: date
+          description: "生效日期"
+
+    EnrollResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "分班成功"
+        data:
+          type: object
+          properties:
+            enrollmentId:
+              type: integer
+              format: int64
+            studentId:
+              type: integer
+              format: int64
+            classId:
+              type: integer
+              format: int64
+            className:
+              type: string
+
+    TransferRequest:
+      type: object
+      required:
+        - targetClassId
+      properties:
+        targetClassId:
+          type: integer
+          format: int64
+        transferDate:
+          type: string
+          format: date
+        reason:
+          type: string
+          maxLength: 200
+
+    TransferResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "转班成功"
+        data:
+          type: object
+          properties:
+            transferId:
+              type: integer
+              format: int64
+            fromClassId:
+              type: integer
+              format: int64
+            toClassId:
+              type: integer
+              format: int64
+
+    WithdrawRequest:
+      type: object
+      required:
+        - withdrawDate
+        - reason
+      properties:
+        withdrawDate:
+          type: string
+          format: date
+        reason:
+          type: string
+          maxLength: 200
+        requireRefund:
+          type: boolean
+          default: true
+          description: "是否需要退费"
+
+    WithdrawResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "退学申请已提交"
+        data:
+          type: object
+          properties:
+            withdrawId:
+              type: integer
+              format: int64
+            refundRequired:
+              type: boolean
+            estimatedRefundAmount:
+              type: number
+              description: "预估退费金额"
+
+    # ---- 课程相关 ----
+    CourseType:
+      type: string
+      enum: ["ENGLISH", "MATH", "CHINESE", "ART", "MUSIC", "SPORTS", "CODING", "OTHER"]
+      description: "课程类型"
+
+    CourseStatus:
+      type: string
+      enum: ["ACTIVE", "INACTIVE"]
+      description: "课程状态：ACTIVE-启用, INACTIVE-停用"
+
+    CourseCreateRequest:
+      type: object
+      required:
+        - name
+        - type
+        - totalHours
+        - price
+      properties:
+        name:
+          type: string
+          description: "课程名称"
+          maxLength: 100
+        type:
+          $ref: "#/components/schemas/CourseType"
+        totalHours:
+          type: integer
+          description: "总课时数"
+          minimum: 1
+        price:
+          type: number
+          description: "课程定价（元）"
+          minimum: 0
+          example: 4800.00
+        description:
+          type: string
+          description: "课程描述"
+          maxLength: 500
+
+    CourseDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/CourseType"
+        totalHours:
+          type: integer
+        price:
+          type: number
+          description: "课程定价（元）"
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/CourseStatus"
+        createTime:
+          type: string
+          format: date-time
+
+    CourseResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          $ref: "#/components/schemas/CourseDTO"
+
+    CoursePageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          type: object
+          properties:
+            pageInfo:
+              $ref: "#/components/schemas/PageInfo"
+            records:
+              type: array
+              items:
+                $ref: "#/components/schemas/CourseDTO"
+
+    # ---- 班级相关 ----
+    ClassStatus:
+      type: string
+      enum: ["RECRUITING", "IN_PROGRESS", "COMPLETED"]
+      description: "班级状态：RECRUITING-招生中, IN_PROGRESS-开课中, COMPLETED-已结课"
+
+    ClassCreateRequest:
+      type: object
+      required:
+        - courseId
+        - name
+        - capacity
+        - startDate
+      properties:
+        courseId:
+          type: integer
+          format: int64
+          description: "关联课程ID"
+        name:
+          type: string
+          description: "班级名称"
+          maxLength: 100
+        capacity:
+          type: integer
+          description: "班级容量上限"
+          minimum: 1
+        startDate:
+          type: string
+          format: date
+          description: "开课日期"
+        endDate:
+          type: string
+          format: date
+          description: "预计结课日期"
+        teacherId:
+          type: integer
+          format: int64
+          description: "班主任ID"
+        classroom:
+          type: string
+          description: "教室名称"
+          maxLength: 50
+
+    ClassDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        courseId:
+          type: integer
+          format: int64
+        courseName:
+          type: string
+        capacity:
+          type: integer
+        enrolledCount:
+          type: integer
+          description: "已报名人数"
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        teacherName:
+          type: string
+        classroom:
+          type: string
+        status:
+          $ref: "#/components/schemas/ClassStatus"
+        createTime:
+          type: string
+          format: date-time
+
+    ClassResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          $ref: "#/components/schemas/ClassDTO"
+
+    ClassPageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          type: object
+          properties:
+            pageInfo:
+              $ref: "#/components/schemas/PageInfo"
+            records:
+              type: array
+              items:
+                $ref: "#/components/schemas/ClassDTO"
+
+    # ---- 排课相关 ----
+    ScheduleItem:
+      type: object
+      required:
+        - dayOfWeek
+        - startTime
+        - endTime
+      properties:
+        dayOfWeek:
+          type: integer
+          description: "星期几（1=周一, 7=周日）"
+          minimum: 1
+          maximum: 7
+        startTime:
+          type: string
+          description: "上课时间"
+          example: "09:00"
+        endTime:
+          type: string
+          description: "下课时间"
+          example: "10:30"
+        teacherId:
+          type: integer
+          format: int64
+        classroom:
+          type: string
+
+    ScheduleCreateRequest:
+      type: object
+      required:
+        - schedules
+      properties:
+        schedules:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ScheduleItem"
+
+    ScheduleDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        classId:
+          type: integer
+          format: int64
+        dayOfWeek:
+          type: integer
+        startTime:
+          type: string
+        endTime:
+          type: string
+        teacherId:
+          type: integer
+          format: int64
+        teacherName:
+          type: string
+        classroom:
+          type: string
+
+    ScheduleResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "排课成功"
+        data:
+          type: object
+          properties:
+            classId:
+              type: integer
+              format: int64
+            schedules:
+              type: array
+              items:
+                $ref: "#/components/schemas/ScheduleDTO"
+
+    # ---- 收费相关 ----
+    PaymentStatus:
+      type: string
+      enum: ["PAID", "PARTIAL", "UNPAID", "REFUNDED"]
+      description: "缴费状态：PAID-已缴清, PARTIAL-部分缴纳, UNPAID-未缴, REFUNDED-已退费"
+
+    PaymentCreateRequest:
+      type: object
+      required:
+        - studentId
+        - classId
+        - amount
+        - paymentMethod
+      properties:
+        studentId:
+          type: integer
+          format: int64
+        classId:
+          type: integer
+          format: int64
+        amount:
+          type: number
+          description: "收费金额（元）"
+          minimum: 0.01
+        paymentMethod:
+          type: string
+          enum: ["CASH", "WECHAT_PAY", "ALIPAY", "BANK_TRANSFER", "POS"]
+        installmentPlan:
+          type: string
+          enum: ["FULL", "INSTALLMENT"]
+          default: "FULL"
+          description: "缴费方式：FULL-全款, INSTALLMENT-分期"
+        installments:
+          type: integer
+          description: "分期数（installmentPlan=INSTALLMENT时必填）"
+        remark:
+          type: string
+          maxLength: 200
+
+    PaymentResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "收费成功"
+        data:
+          type: object
+          properties:
+            paymentId:
+              type: integer
+              format: int64
+            serialNo:
+              type: string
+              description: "业务流水号"
+              example: "FEE-20260622-000001"
+            amount:
+              type: number
+            paymentTime:
+              type: string
+              format: date-time
+
+    RefundRequest:
+      type: object
+      required:
+        - paymentId
+        - amount
+        - refundMethod
+        - reason
+      properties:
+        paymentId:
+          type: integer
+          format: int64
+          description: "原收费记录ID"
+        amount:
+          type: number
+          description: "退费金额（元）"
+          minimum: 0.01
+        refundMethod:
+          type: string
+          enum: ["ORIGINAL", "CASH", "BANK_TRANSFER"]
+          description: "退费方式：ORIGINAL-原路退回"
+        reason:
+          type: string
+          description: "退费原因"
+          maxLength: 200
+
+    RefundResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "退费成功"
+        data:
+          type: object
+          properties:
+            refundId:
+              type: integer
+              format: int64
+            serialNo:
+              type: string
+              example: "FEE-20260622-000002"
+            refundAmount:
+              type: number
+            refundTime:
+              type: string
+              format: date-time
+
+    FeeRecordDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        serialNo:
+          type: string
+          description: "业务流水号"
+          example: "FEE-20260622-000001"
+        studentId:
+          type: integer
+          format: int64
+        studentName:
+          type: string
+        classId:
+          type: integer
+          format: int64
+        className:
+          type: string
+        amount:
+          type: number
+          description: "金额（元）"
+        paymentMethod:
+          type: string
+        paymentStatus:
+          $ref: "#/components/schemas/PaymentStatus"
+        paymentTime:
+          type: string
+          format: date-time
+        operatorName:
+          type: string
+          description: "操作人"
+
+    FeeRecordPageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          type: object
+          properties:
+            pageInfo:
+              $ref: "#/components/schemas/PageInfo"
+            summary:
+              type: object
+              properties:
+                totalAmount:
+                  type: number
+                  description: "总金额合计"
+                paidAmount:
+                  type: number
+                  description: "已收金额合计"
+                unpaidAmount:
+                  type: number
+                  description: "未收金额合计"
+            records:
+              type: array
+              items:
+                $ref: "#/components/schemas/FeeRecordDTO"
+
+    DunningItemDTO:
+      type: object
+      properties:
+        studentId:
+          type: integer
+          format: int64
+        studentName:
+          type: string
+        studentPhone:
+          type: string
+        className:
+          type: string
+        courseName:
+          type: string
+        totalFee:
+          type: number
+        paidAmount:
+          type: number
+        unpaidAmount:
+          type: number
+          description: "欠费金额"
+        overdueDays:
+          type: integer
+          description: "逾期天数"
+
+    DunningPageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          type: object
+          properties:
+            pageInfo:
+              $ref: "#/components/schemas/PageInfo"
+            totalUnpaidAmount:
+              type: number
+              description: "欠费总额"
+            records:
+              type: array
+              items:
+                $ref: "#/components/schemas/DunningItemDTO"
+
+    # ---- 考勤相关 ----
+    CheckinRequest:
+      type: object
+      required:
+        - studentId
+        - scheduleId
+      properties:
+        studentId:
+          type: integer
+          format: int64
+        scheduleId:
+          type: integer
+          format: int64
+          description: "课程安排ID"
+        checkinType:
+          type: string
+          enum: ["FACE", "CARD", "QR_CODE", "MANUAL"]
+          default: "FACE"
+          description: "签到方式"
+        location:
+          type: string
+          description: "签到地点"
+
+    CheckinResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "签到成功"
+        data:
+          type: object
+          properties:
+            checkinId:
+              type: integer
+              format: int64
+            checkinTime:
+              type: string
+              format: date-time
+            status:
+              type: string
+              enum: ["ON_TIME", "LATE", "ABSENT"]
+              description: "签到状态"
+
+    LeaveRequest:
+      type: object
+      required:
+        - studentId
+        - scheduleId
+        - leaveType
+        - reason
+        - startDate
+        - endDate
+      properties:
+        studentId:
+          type: integer
+          format: int64
+        scheduleId:
+          type: integer
+          format: int64
+        leaveType:
+          type: string
+          enum: ["SICK", "PERSONAL", "OTHER"]
+          description: "请假类型"
+        reason:
+          type: string
+          maxLength: 200
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+
+    LeaveResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "请假申请已提交"
+        data:
+          type: object
+          properties:
+            leaveId:
+              type: integer
+              format: int64
+            status:
+              type: string
+              enum: ["PENDING", "APPROVED", "REJECTED"]
+
+    AttendanceStatisticsDTO:
+      type: object
+      properties:
+        studentId:
+          type: integer
+          format: int64
+        studentName:
+          type: string
+        className:
+          type: string
+        totalSchedules:
+          type: integer
+          description: "总课时数"
+        attended:
+          type: integer
+          description: "出勤次数"
+        late:
+          type: integer
+          description: "迟到次数"
+        leave:
+          type: integer
+          description: "请假次数"
+        absent:
+          type: integer
+          description: "缺勤次数"
+        attendanceRate:
+          type: number
+          description: "出勤率（百分比）"
+          example: 95.8
+
+    AttendanceStatisticsResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: "操作成功"
+        data:
+          type: object
+          properties:
+            queryPeriod:
+              type: object
+              properties:
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+            summary:
+              type: object
+              properties:
+                avgAttendanceRate:
+                  type: number
+                  description: "平均出勤率"
+                totalStudents:
+                  type: integer
+            records:
+              type: array
+              items:
+                $ref: "#/components/schemas/AttendanceStatisticsDTO"

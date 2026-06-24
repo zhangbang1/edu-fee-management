@@ -1,0 +1,294 @@
+@startuml 教育培训机构教务收费管理系统-类图
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam class {
+    BackgroundColor #E3F2FD
+    BorderColor #1565C0
+    FontSize 12
+    HeaderBackgroundColor #1565C0
+    HeaderFontColor #FFFFFF
+    HeaderFontSize 13
+    HeaderFontStyle bold
+}
+skinparam package {
+    BackgroundColor #F5F5F5
+    BorderColor #9E9E9E
+    FontSize 14
+    FontStyle bold
+}
+
+title 教育培训机构教务收费管理系统 - 核心类图
+
+' ============================================================
+' 核心实体类
+' ============================================================
+
+class Student {
+    - Long studentId <<PK>>
+    - String name
+    - String gender
+    - Date birthDate
+    - String phone
+    - String parentName
+    - String parentPhone
+    - String address
+    - String school
+    - String grade
+    - String source
+    - String status
+    - Date createTime
+    - Date updateTime
+    --
+    + register()
+    + updateInfo()
+    + queryEnrollments()
+    + getAttendanceRecords()
+}
+
+class Course {
+    - Long courseId <<PK>>
+    - String courseName
+    - String courseCode
+    - String category
+    - String description
+    - Integer totalHours
+    - Integer lessonDuration
+    - String targetGrade
+    - Integer maxStudents
+    - BigDecimal basePrice
+    - String status
+    - Date createTime
+    --
+    + createCourse()
+    + updateCourse()
+    + setPricing()
+    + queryClasses()
+}
+
+class Class {
+    - Long classId <<PK>>
+    - Long courseId <<FK>>
+    - String className
+    - String classCode
+    - Long teacherId <<FK>>
+    - Long classroomId <<FK>>
+    - Integer maxCapacity
+    - Integer currentCount
+    - Date startDate
+    - Date endDate
+    - String schedule
+    - String status
+    --
+    + openClass()
+    + closeClass()
+    + addStudent()
+    + removeStudent()
+    + isFull()
+    + getStudentList()
+}
+
+class Teacher {
+    - Long teacherId <<PK>>
+    - String name
+    - String gender
+    - String phone
+    - String email
+    - String subject
+    - String qualification
+    - Integer experience
+    - String status
+    - Date hireDate
+    --
+    + register()
+    + updateInfo()
+    + getSchedule()
+    + getCourseLoad()
+    + getHourlyStats()
+}
+
+class Enrollment {
+    - Long enrollmentId <<PK>>
+    - Long studentId <<FK>>
+    - Long classId <<FK>>
+    - Long courseId <<FK>>
+    - Date enrollDate
+    - String enrollType
+    - String payStatus
+    - BigDecimal totalFee
+    - BigDecimal paidAmount
+    - BigDecimal unpaidAmount
+    - String status
+    - String remark
+    --
+    + submit()
+    + assignClass()
+    + transferClass()
+    + withdraw()
+    + calculateFee()
+    + updatePayStatus()
+}
+
+class FeeRecord {
+    - Long feeId <<PK>>
+    - Long enrollmentId <<FK>>
+    - Long studentId <<FK>>
+    - String feeType
+    - BigDecimal amount
+    - String payMethod
+    - String receiptNo
+    - Date payTime
+    - String operatorId
+    - String status
+    - String remark
+    --
+    + charge()
+    + refund()
+    + printReceipt()
+    + queryByStudent()
+    + queryByDateRange()
+    + generateLedger()
+}
+
+class Attendance {
+    - Long attendanceId <<PK>>
+    - Long studentId <<FK>>
+    - Long scheduleId <<FK>>
+    - Long classId <<FK>>
+    - Date attendanceDate
+    - String status
+    - Date checkInTime
+    - Date checkOutTime
+    - String remark
+    --
+    + checkIn()
+    + checkOut()
+    + requestLeave()
+    + markAbsence()
+    + getStats()
+}
+
+class Schedule {
+    - Long scheduleId <<PK>>
+    - Long classId <<FK>>
+    - Long teacherId <<FK>>
+    - Long classroomId <<FK>>
+    - Date scheduleDate
+    - Time startTime
+    - Time endTime
+    - String dayOfWeek
+    - String lessonContent
+    - String status
+    --
+    + createSchedule()
+    + cancelSchedule()
+    + reschedule()
+    + checkTeacherConflict()
+    + checkRoomConflict()
+    + checkStudentConflict()
+}
+
+class Payment {
+    - Long paymentId <<PK>>
+    - Long feeRecordId <<FK>
+    - Long studentId <<FK>>
+    - String transactionNo
+    - BigDecimal amount
+    - String payMethod
+    - String payChannel
+    - String payStatus
+    - Date createTime
+    - Date completeTime
+    - String callbackData
+    --
+    + createOrder()
+    + processPayment()
+    + refund()
+    + queryStatus()
+    + callback()
+}
+
+class Classroom {
+    - Long classroomId <<PK>>
+    - String roomName
+    - String roomCode
+    - String building
+    - Integer floor
+    - Integer capacity
+    - String equipment
+    - String status
+    --
+    + addRoom()
+    + updateRoom()
+    + isAvailable()
+    + getSchedule()
+}
+
+class Discount {
+    - Long discountId <<PK>>
+    - String discountName
+    - String discountType
+    - BigDecimal discountValue
+    - Date startDate
+    - Date endDate
+    - String applyTo
+    - String status
+    --
+    + createDiscount()
+    + calculate()
+    + isApplicable()
+}
+
+class DunningNotice {
+    - Long noticeId <<PK>>
+    - Long studentId <<FK>>
+    - Long enrollmentId <<FK>>
+    - BigDecimal unpaidAmount
+    - Integer overdueDays
+    - String noticeLevel
+    - String noticeContent
+    - Date sendTime
+    - String sendMethod
+    - String followUpStatus
+    - String followUpRemark
+    --
+    + generate()
+    + send()
+    + recordFollowUp()
+    + escalation()
+}
+
+' ============================================================
+' 关系定义
+' ============================================================
+
+' 一对一关系
+Payment ||--|| FeeRecord : "1:1 对应"
+
+' 一对多关系
+Student "1" -- "*" Enrollment : "报名"
+Student "1" -- "*" Attendance : "考勤记录"
+Student "1" -- "*" FeeRecord : "缴费记录"
+Student "1" -- "*" Payment : "支付记录"
+Student "1" -- "*" DunningNotice : "催缴通知"
+
+Course "1" -- "*" Class : "开设班级"
+Course "1" -- "*" Enrollment : "课程报名"
+
+Class "1" -- "*" Enrollment : "班级学员"
+Class "1" -- "*" Schedule : "排课计划"
+Class "1" -- "*" Attendance : "班级考勤"
+
+Teacher "1" -- "*" Schedule : "教师排课"
+Teacher "1" -- "*" Class : "负责班级"
+
+Classroom "1" -- "*" Schedule : "教室安排"
+
+Enrollment "1" -- "*" FeeRecord : "收费记录"
+Enrollment "1" -- "*" DunningNotice : "催缴"
+
+Schedule "1" -- "*" Attendance : "课时考勤"
+
+' 折扣关联
+Discount "0..*" -- "*" FeeRecord : "适用折扣"
+
+@enduml

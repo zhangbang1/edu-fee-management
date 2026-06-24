@@ -1,0 +1,65 @@
+# ============================================================
+# EduFeeMS 项目 Git 忽略规则
+# ============================================================
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.log
+*.ctxt
+.mtj.tmp/
+hs_err_pid*
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Obsidian
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/plugins/
+.trash/
+
+# Build
+dist/
+build/
+out/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary
+*.tmp
+*.temp
+~$*
+
+# Files with special characters that cause git issues
+✅_看到这个文件了吗.txt

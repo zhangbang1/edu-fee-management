@@ -1,0 +1,113 @@
+# ============================================================
+# EduFeeMS 教育培训机构教务收费管理系统 - 主配置文件
+# ============================================================
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: edufee-ms
+  profiles:
+    active: dev
+
+  # 数据源配置 (H2 内存数据库，演示模式)
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:edufee_db;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    # 连接池配置
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-timeout: 30000
+
+  # H2 Web Console（开发调试用: http://localhost:8080/h2-console）
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+  # SQL初始化（自动执行schema.sql和data.sql）
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:init-h2.sql
+      continue-on-error: true
+
+  # Jackson序列化配置
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  # 实体类扫描包路径
+  type-aliases-package: com.edufee.**.entity
+  # mapper XML文件位置（如有）
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    # 驼峰命名自动映射
+    map-underscore-to-camel-case: true
+    # 日志输出
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 缓存
+    cache-enabled: false
+  global-config:
+    db-config:
+      # 主键类型：自增ID
+      id-type: auto
+      # 逻辑删除字段
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+      # 表名前缀（可选）
+      # table-prefix: edu_
+    banner: false
+
+# JWT 配置
+jwt:
+  # JWT签名密钥（HMAC-SHA256需要至少256位即32字节）
+  secret: edufee-ms-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-security
+  # 令牌过期时间（秒），默认24小时 = 86400
+  expiration: 86400
+
+# SpringDoc / Knife4j API文档配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.edufee
+
+# Knife4j 增强配置
+knife4j:
+  enable: true
+  setting:
+    language: zh-CN
+    enable-swagger-models: true
+    enable-document-manage: true
+    enable-footer: false
+    enable-footer-custom: true
+    footer-custom-content: "EduFeeMS 教育培训机构教务收费管理系统 | Copyright 2025"
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.edufee: DEBUG
+    org.springframework.security: INFO
+    com.baomidou.mybatisplus:

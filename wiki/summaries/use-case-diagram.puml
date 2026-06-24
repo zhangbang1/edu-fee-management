@@ -1,0 +1,178 @@
+@startuml 教育培训机构教务收费管理系统-用例图
+!theme plain
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #E8F4FD
+    BorderColor #1565C0
+    FontSize 13
+}
+skinparam package {
+    BackgroundColor #F5F5F5
+    BorderColor #757575
+    FontSize 14
+    FontStyle bold
+}
+
+left to right direction
+
+' ==================== 参与者定义 ====================
+actor "机构管理员" as Admin <<系统管理员>> #FFD54F
+actor "教务人员" as Academic <<教务>> #81C784
+actor "财务人员" as Finance <<财务>> #64B5F6
+actor "教师" as Teacher <<教师>> #CE93D8
+actor "学生/家长" as Student <<学生/家长>> #FFAB91
+
+' ==================== 系统边界 ====================
+rectangle "教育培训机构教务收费管理系统" as System {
+
+    ' --- 学员管理 ---
+    package "学员管理" #E8F5E9 {
+        usecase "新增学员" as UC_AddStudent
+        usecase "修改学员信息" as UC_EditStudent
+        usecase "查询学员" as UC_SearchStudent
+        usecase "删除学员" as UC_DeleteStudent
+        usecase "学员分班" as UC_AssignClass
+        usecase "学员转班" as UC_TransferClass
+        usecase "学员退学" as UC_Withdraw
+    }
+
+    ' --- 课程管理 ---
+    package "课程管理" #FFF3E0 {
+        usecase "课程类型设置" as UC_CourseType
+        usecase "课时管理" as UC_CourseHour
+        usecase "课程定价" as UC_CoursePricing
+    }
+
+    ' --- 班级管理 ---
+    package "班级管理" #E3F2FD {
+        usecase "开班" as UC_OpenClass
+        usecase "排课" as UC_Schedule
+        usecase "班级学员管理" as UC_ClassStudentMgmt
+        usecase "班级结业" as UC_CloseClass
+    }
+
+    ' --- 教师管理 ---
+    package "教师管理" #F3E5F5 {
+        usecase "教师信息管理" as UC_TeacherInfo
+        usecase "教师排课" as UC_TeacherSchedule
+        usecase "教师课时统计" as UC_TeacherHourStat
+    }
+
+    ' --- 收费管理 ---
+    package "收费管理" #FFEBEE {
+        usecase "收费设置" as UC_FeeSetting
+        usecase "收费" as UC_ChargeFee
+        usecase "退费" as UC_Refund
+        usecase "欠费催缴" as UC_Dunning
+        usecase "打印收据" as UC_PrintReceipt
+        usecase "台账记录" as UC_LedgerRecord
+    }
+
+    ' --- 考勤管理 ---
+    package "考勤管理" #E0F7FA {
+        usecase "签到" as UC_CheckIn
+        usecase "请假" as UC_Leave
+        usecase "缺勤记录" as UC_Absence
+        usecase "考勤统计" as UC_AttendanceStat
+    }
+
+    ' --- 报表统计 ---
+    package "报表统计" #FCE4EC {
+        usecase "财务报表" as UC_FinanceReport
+        usecase "课时统计" as UC_HourReport
+        usecase "学员统计" as UC_StudentReport
+        usecase "教师绩效统计" as UC_TeacherReport
+    }
+
+    ' --- 系统管理 ---
+    package "系统管理" #ECEFF1 {
+        usecase "用户管理" as UC_UserMgmt
+        usecase "权限管理" as UC_Permission
+        usecase "基础配置" as UC_BaseConfig
+        usecase "数据备份" as UC_Backup
+    }
+
+    ' --- 辅助用例 ---
+    usecase "用户登录" as UC_Login
+    usecase "身份验证" as UC_Auth
+    usecase "费用计算" as UC_CalcFee
+    usecase "发送通知" as UC_SendNotify
+}
+
+' ==================== 参与者与用例关系 ====================
+' 机构管理员
+Admin --> UC_UserMgmt
+Admin --> UC_Permission
+Admin --> UC_BaseConfig
+Admin --> UC_Backup
+Admin --> UC_FinanceReport
+Admin --> UC_TeacherReport
+
+' 教务人员
+Academic --> UC_AddStudent
+Academic --> UC_EditStudent
+Academic --> UC_SearchStudent
+Academic --> UC_DeleteStudent
+Academic --> UC_AssignClass
+Academic --> UC_TransferClass
+Academic --> UC_Withdraw
+Academic --> UC_CourseType
+Academic --> UC_CourseHour
+Academic --> UC_CoursePricing
+Academic --> UC_OpenClass
+Academic --> UC_Schedule
+Academic --> UC_ClassStudentMgmt
+Academic --> UC_CloseClass
+Academic --> UC_TeacherInfo
+Academic --> UC_TeacherSchedule
+Academic --> UC_TeacherHourStat
+Academic --> UC_StudentReport
+Academic --> UC_HourReport
+
+' 财务人员
+Finance --> UC_FeeSetting
+Finance --> UC_ChargeFee
+Finance --> UC_Refund
+Finance --> UC_Dunning
+Finance --> UC_PrintReceipt
+Finance --> UC_LedgerRecord
+Finance --> UC_FinanceReport
+
+' 教师
+Teacher --> UC_CheckIn
+Teacher --> UC_Leave
+Teacher --> UC_Absence
+Teacher --> UC_AttendanceStat
+Teacher --> UC_TeacherHourStat
+
+' 学生/家长
+Student --> UC_SearchStudent
+Student --> UC_ChargeFee
+Student --> UC_CheckIn
+Student --> UC_Leave
+
+' ==================== Include 关系 ====================
+UC_Login ..> UC_Auth : <<include>>
+UC_AddStudent ..> UC_Auth : <<include>>
+UC_ChargeFee ..> UC_CalcFee : <<include>>
+UC_ChargeFee ..> UC_PrintReceipt : <<include>>
+UC_ChargeFee ..> UC_LedgerRecord : <<include>>
+UC_Refund ..> UC_Auth : <<include>>
+UC_Refund ..> UC_LedgerRecord : <<include>>
+UC_Dunning ..> UC_SendNotify : <<include>>
+UC_AssignClass ..> UC_SearchStudent : <<include>>
+UC_TransferClass ..> UC_SearchStudent : <<include>>
+UC_Withdraw ..> UC_SearchStudent : <<include>>
+UC_Schedule ..> UC_TeacherSchedule : <<include>>
+UC_TeacherHourStat ..> UC_AttendanceStat : <<include>>
+UC_FinanceReport ..> UC_LedgerRecord : <<include>>
+UC_StudentReport ..> UC_SearchStudent : <<include>>
+
+' ==================== Extend 关系 ====================
+UC_CheckIn ..> UC_Absence : <<extend>>
+UC_ChargeFee ..> UC_Dunning : <<extend>>
+UC_Withdraw ..> UC_Refund : <<extend>>
+UC_AssignClass ..> UC_TransferClass : <<extend>>
+
+@enduml
