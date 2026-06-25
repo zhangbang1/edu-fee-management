@@ -63,3 +63,10 @@ Desktop.ini
 
 # Files with special characters that cause git issues
 ✅_看到这个文件了吗.txt
+项目说明.md
+
+# n8n runtime data (generated at runtime)
+n8n/.n8n_data/
+
+# edu-server/pom.xml has indexing issues in git
+src/backend/edu-server/pom.xml
