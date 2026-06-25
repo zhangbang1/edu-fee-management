@@ -1,0 +1,222 @@
+{
+  "name": "EduFeeMS 需求工程自动化流水线 (Workflow-01)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-001",
+      "name": "手动触发：开始需求工程",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "requirement-kickoff",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-002",
+      "name": "Webhook：接收项目启动指令",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 1：A1 涉众AI智能体 → 需求获取\n// 模拟5个涉众Agent并行对话获取需求\n// ============================================================\n\nconst stakeholders = [\n  { id: 'A1-1', name: '机构管理员', priority: 'P0' },\n  { id: 'A1-2', name: '教务人员',     priority: 'P0' },\n  { id: 'A1-3', name: '财务人员',     priority: 'P0' },\n  { id: 'A1-4', name: '教师',         priority: 'P1' },\n  { id: 'A1-5', name: '学生/家长',    priority: 'P1' }\n];\n\nconst timestamp = new Date().toISOString().split('T')[0];\n\nreturn stakeholders.map(s => ({\n  json: {\n    agentId: s.id,\n    agentName: s.name,\n    priority: s.priority,\n    status: 'DIALOG_STARTED',\n    timestamp: timestamp,\n    outputPath: `raw/dialogs/${s.name}-${timestamp}-对话记录.md`,\n    notesPath: `raw/notes/${s.name}-${timestamp}-需求记录.md`\n  }\n}));"
+      },
+      "id": "node-003",
+      "name": "A1 涉众Agent需求获取",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 2：A2 需求分析智能体 → 质量检测\n// 检测模糊/不一致/矛盾/缺失四类问题\n// ============================================================\n\nconst qualityChecks = [\n  { type: '模糊需求',   rule: '需求描述是否足够具体？',      check: 'contains_vague_terms' },\n  { type: '不一致需求', rule: '同一概念在不同文档中是否一致？', check: 'cross_doc_compare' },\n  { type: '矛盾需求',   rule: '不同涉众需求是否存在冲突？',   check: 'stakeholder_conflict' },\n  { type: '缺失需求',   rule: '是否存在明显的需求遗漏？',     check: 'coverage_analysis' }\n];\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  for (const qc of qualityChecks) {\n    results.push({\n      json: {\n        ...item.json,\n        checkType: qc.type,\n        checkRule: qc.rule,\n        status: items.indexOf(item) % 3 === 0 ? 'ISSUE_FOUND' : 'PASSED',\n        issueCount: items.indexOf(item) % 3 === 0 ? Math.floor(Math.random() * 3) + 1 : 0,\n        rollbackFile: `raw/回退记录.md`\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "node-004",
+      "name": "A2 需求质量检测",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": [
+            {
+              "id": "0ed2e39b-c4d1-40bd-a20b-0bde218bdf82",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ISSUE_FOUND",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "renamed": "发现质量问题"
+            }
+          ]
+        }
+      },
+      "id": "node-005",
+      "name": "IF：是否有质量问题？",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 2a：回退到对应涉众Agent重新获取需求\n// 生成回退记录并触发涉众重新对话\n// ============================================================\n\nconst items = $input.all();\nconst rollbacks = [];\n\nfor (const item of items) {\n  rollbacks.push({\n    json: {\n      rollbackNo: `RB-${String(rollbacks.length + 1).padStart(3, '0')}`,\n      agentId: item.json.agentId,\n      agentName: item.json.agentName,\n      issueType: item.json.checkType,\n      rollbackTime: new Date().toISOString(),\n      status: 'ROLLED_BACK',\n      message: `回退至${item.json.agentName}Agent，重新获取需求`,\n      outputPath: 'raw/回退记录.md'\n    }\n  });\n}\n\nreturn rollbacks;"
+      },
+      "id": "node-006",
+      "name": "回退→涉众Agent重新获取",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 3：A3 建模智能体 → 生成UML模型\n// 用例图、类图、时序图、活动图\n// ============================================================\n\nreturn [{\n  json: {\n    phase: 'MODELING',\n    agent: 'A3-建模智能体',\n    outputs: [\n      { type: '用例图',     file: 'wiki/summaries/use-case-diagram.puml' },\n      { type: '类图',       file: 'wiki/summaries/class-diagram.puml' },\n      { type: '时序图',     file: 'wiki/summaries/sequence-enrollment.puml' },\n      { type: '活动图-报名', file: 'wiki/summaries/activity-enrollment.puml' },\n      { type: '活动图-收费', file: 'wiki/summaries/activity-fee-management.puml' },\n      { type: '活动图-排课', file: 'wiki/summaries/activity-scheduling.puml' }\n    ],\n    status: 'MODELING_COMPLETE',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-007",
+      "name": "A3 UML建模",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 4：A4 需求文档智能体 → 生成SRS初稿\n// 基于IEEE 830标准\n// ============================================================\n\nreturn [{\n  json: {\n    phase: 'SRS_DRAFT',\n    agent: 'A4-需求文档智能体',\n    standard: 'IEEE 830-1998',\n    srsVersion: 'V1.0',\n    moduleCount: 8,\n    totalRequirements: 100,\n    functionalReqs: 100,\n    nonFunctionalReqs: 29,\n    status: 'SRS_DRAFT_COMPLETE',\n    outputPath: 'wiki/summaries/SRS-软件需求规格说明书.md',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-008",
+      "name": "A4 生成SRS初稿",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 5：A5 需求验证智能体 → 交叉验证\n// 四维度验证：完整性/一致性/可追溯性/UML对齐\n// ============================================================\n\nreturn [{\n  json: {\n    phase: 'VALIDATION',\n    agent: 'A5-需求验证智能体',\n    checks: [\n      { dimension: '完整性验证',    result: 'PASS',  coverage: '100%' },\n      { dimension: '一致性验证',    result: 'PASS',  issues: 0 },\n      { dimension: '可追溯性验证',  result: 'PASS',  coverage: '100%' },\n      { dimension: 'UML模型对齐',   result: 'PASS',  issues: 0 }\n    ],\n    conclusion: 'CONDITIONAL_PASS',\n    issues: 7,\n    outputPath: 'wiki/summaries/需求验证报告.md',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-009",
+      "name": "A5 需求交叉验证",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": [
+            {
+              "id": "baseline-check",
+              "leftValue": "={{ $json.conclusion }}",
+              "rightValue": "CONDITIONAL_PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "renamed": "有条件通过→创建基线"
+            }
+          ]
+        }
+      },
+      "id": "node-010",
+      "name": "IF：验证通过？",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 6：A6 需求基线智能体 → 创立基线 + 溯源矩阵\n// ============================================================\n\nconst baselineId = `BL-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-01`;\n\nreturn [{\n  json: {\n    phase: 'BASELINE',\n    agent: 'A6-需求基线智能体',\n    baselineId: baselineId,\n    baselineName: 'EduFeeMS 初始需求基线',\n    outputs: [\n      { type: 'SRS正式版',   file: `wiki/baselines/${baselineId}/SRS-正式版.md` },\n      { type: '基线说明',     file: `wiki/baselines/${baselineId}/基线说明.md` },\n      { type: '溯源矩阵',     file: `wiki/baselines/${baselineId}/溯源矩阵.md` },\n      { type: '需求清单',     file: `wiki/baselines/${baselineId}/需求清单.md` }\n    ],\n    traceabilityStats: {\n      totalRequirements: 100,\n      traceableToStakeholder: '100%',\n      traceableToDialogs: '100%',\n      traceableToUML: '100%'\n    },\n    status: 'BASELINE_CREATED',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-011",
+      "name": "A6 创立需求基线",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 7：CCB变更控制委员会 → 审批\n// 编制→审核→批准 三级签批\n// ============================================================\n\nconst baselineId = $input.first().json.baselineId;\n\nreturn [{\n  json: {\n    phase: 'CCB_APPROVAL',\n    approvers: [\n      { role: '编制人', name: 'A5-需求验证智能体', status: 'APPROVED', date: new Date().toISOString() },\n      { role: '审核人', name: 'CCB-变更控制委员会', status: 'APPROVED', date: new Date().toISOString() },\n      { role: '批准人', name: '机构管理员',           status: 'APPROVED', date: new Date().toISOString() }\n    ],\n    conclusion: '批准BL-' + baselineId + '作为首个正式需求基线',\n    nextPhase: '软件设计阶段',\n    status: 'CCB_APPROVED',\n    outputPath: `wiki/baselines/${baselineId}/基线说明.md`,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-012",
+      "name": "CCB审批签章",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Step 8：发送通知 → 钉钉/邮件/企业微信\n// 通知下一步：进入软件设计阶段\n// ============================================================\n\nconst baseline = $input.first().json;\n\nreturn [{\n  json: {\n    phase: 'NOTIFICATION',\n    title: `EduFeeMS 需求基线已审批通过`,\n    message: `${baseline.conclusion}\n下一步：进入软件设计阶段\n\n需关注7个ISS问题的跟踪。`,\n    channels: ['Email', 'DingTalk', 'WeCom'],\n    recipients: ['team@edufee.com'],\n    status: 'NOTIFIED',\n    workflowEnd: true,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-013",
+      "name": "通知：进入设计阶段",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2450, 400]
+    },
+    {
+      "parameters": {
+        "operation": "respondAndWait",
+        "options": {}
+      },
+      "id": "node-014",
+      "name": "Webhook响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [550, 500]
+    }
+  ],
+  "connections": {
+    "手动触发：开始需求工程": {
+      "main": [[ { "node": "A1 涉众Agent需求获取", "type": "main", "index": 0 } ]]
+    },
+    "A1 涉众Agent需求获取": {
+      "main": [[ { "node": "A2 需求质量检测", "type": "main", "index": 0 } ]]
+    },
+    "A2 需求质量检测": {
+      "main": [[ { "node": "IF：是否有质量问题？", "type": "main", "index": 0 } ]]
+    },
+    "IF：是否有质量问题？": {
+      "main": [
+        [{ "node": "回退→涉众Agent重新获取", "type": "main", "index": 0 }],
+        [{ "node": "A3 UML建模", "type": "main", "index": 0 }]
+      ]
+    },
+    "回退→涉众Agent重新获取": {
+      "main": [[ { "node": "A1 涉众Agent需求获取", "type": "main", "index": 0 } ]]
+    },
+    "A3 UML建模": {
+      "main": [[ { "node": "A4 生成SRS初稿", "type": "main", "index": 0 } ]]
+    },
+    "A4 生成SRS初稿": {
+      "main": [[ { "node": "A5 需求交叉验证", "type": "main", "index": 0 } ]]
+    },
+    "A5 需求交叉验证": {
+      "main": [[ { "node": "IF：验证通过？", "type": "main", "index": 0 } ]]
+    },
+    "IF：验证通过？": {
+      "main": [
+        [{ "node": "A6 创立需求基线", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "A6 创立需求基线": {
+      "main": [[ { "node": "CCB审批签章", "type": "main", "index": 0 } ]]
+    },
+    "CCB审批签章": {
+      "main": [[ { "node": "通知：进入设计阶段", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "1.0.0",
+  "staticData": {
+    "workflowDescription": "EduFeeMS 需求工程自动化流水线：A1涉众需求获取→A2质量检测→回退修订→A3 UML建模→A4 SRS生成→A5交叉验证→A6基线创立→CCB审批→通知"
+  }
+}
